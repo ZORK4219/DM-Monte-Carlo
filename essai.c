@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define PI 3.141592653589793
+
 const double rc=2.5;
 typedef struct 
 {
@@ -28,8 +30,6 @@ void configuration_cristalline(Particule tab_particules[], int N, double L) {
     }
 }
 
-
-
 void configuration_aleatoire(Particule tab_particules[],int N, double L)
 {
     for (int k = 0; k < N; k++) 
@@ -39,41 +39,31 @@ void configuration_aleatoire(Particule tab_particules[],int N, double L)
     tab_particules[k].y = ((double)rand() / RAND_MAX) * L - L / 2.;
     }
 }
-void copy_configuration(Particule tab_particules_lamda[],Particule tab_particules_lamda_prime[],int N)
-{
-    for (int k = 0; k < N; k++) 
-    {
-    // Copie des positions dans tab_particules_lamda_prime
-    tab_particules_lamda_prime[k].x = tab_particules_lamda[k].x;
-    tab_particules_lamda_prime[k].y = tab_particules_lamda[k].y;
-    }
-}
-double Energie(Particule tab_particules[],int N,double L)
+
+double Energie_1part(Particule tab_particules[], Particule part_concernee, int index_concernee, int taille_tableau, double taille_boite)
 {
     double rij,U=0.0;
     double U_decale=4*(pow(1/rc,12) - pow(1/rc,6)),dx,dy;
-
-    for (int i = 0; i < N; i++)
+    for (int j = 0; j < taille_tableau; j++)
     {
-        for (int j = i+1; j < N; j++)
+        if (j == index_concernee)
         {
-            dx=tab_particules[i].x-tab_particules[j].x;
-            dy=tab_particules[i].y-tab_particules[j].y;
-            dx=dx-round(dx/L)*L;
-            dy=dy-round(dy/L)*L;
-            rij=sqrt(dx*dx+dy*dy);
-            if( rij<rc)
-            {
-                U += 4 *((pow(1/rij,12) - pow(1/rij,6)) )-U_decale;
-            }
-            else
-            {
-                U+=0;
-            }        
+            continue;
         }
+        dx=part_concernee.x-tab_particules[j].x;
+        dy=part_concernee.y-tab_particules[j].y;
+        dx=dx-round(dx/taille_boite)*taille_boite;
+        dy=dy-round(dy/taille_boite)*taille_boite;
+        rij=sqrt(dx*dx+dy*dy);
+        if( rij<rc)
+        {
+            U += 4 *((pow(1/rij,12) - pow(1/rij,6)) )-U_decale;
+            printf("U = %f\n", U);
+        }      
     }
     return U;
 }
+
 void conditions_periodiques(Particule tab_particules[],int N,double L)
 {
     for (int i = 0; i < N; i++) 
@@ -85,45 +75,42 @@ void conditions_periodiques(Particule tab_particules[],int N,double L)
         
     }
 }
-int Tirage_changement(Particule tab_particules[], int N) 
-{
+
+void Metropolis(Particule tab_particules_lamda_i[], int N, double T, double L) 
+{    
     // Tirer une particule au hasard
-    int index = rand() % N;
+    int index = rand() % (N);
+    printf("index tiré = %d\n", index);
     double Dr=0.2;
-    Particule particule = tab_particules[index];
+    Particule particule_i = tab_particules_lamda_i[index];
+    Particule particule_ip1 = tab_particules_lamda_i[index];
 
     // Tirer un rayon aléatoire entre 0 et R_MAX
     double r = ((double)rand() / RAND_MAX) * Dr;
 
     // Tirer un angle aléatoire entre 0 et 2π
-    double theta = ((double)rand() / RAND_MAX) * 2.0 * M_PI;
+    double theta = ((double)rand() / RAND_MAX) * 2.0 * PI;
 
     // Calculer les nouveaux déplacements en x et y
     double dx = r * cos(theta);
     double dy = r * sin(theta);
 
-    tab_particules[index].x+=dx;
-    tab_particules[index].y+=dy;
-    
-    return index;
-}
+    particule_ip1.x+=dx;
+    particule_ip1.y+=dy;
 
-void Metropolis(Particule tab_particules_lamda[],Particule tab_particules_lamda_prime[], int N, double T,double L) 
-{    
-    double E_lamda=Energie(tab_particules_lamda,N,L);
-    double E_lamda_prime=Energie(tab_particules_lamda_prime,N,L);
-    double facteur_boltzmann=exp(-(E_lamda_prime-E_lamda)/T);
+    double E_lamda_i=0;//Energie_1part(tab_particules_lamda_i, particule_i, index, N, L);
+    double E_lamda_ip1=Energie_1part(tab_particules_lamda_i, particule_ip1, index, N, L);
+    double delta_E = E_lamda_ip1 - E_lamda_i;
+
+    double facteur_boltzmann=exp(-delta_E/T);
     double A=fmin(1,facteur_boltzmann);
-    printf("%g\n",A);
+    printf("A = %f | boltzmann = %f\n", A, facteur_boltzmann);
     double nombre = ((double)rand() / RAND_MAX);
 
     if(nombre<A)
     {
-        for (int i=0; i<N;i++)
-        {
-        tab_particules_lamda[i].x=tab_particules_lamda_prime[i].x;
-        tab_particules_lamda[i].y=tab_particules_lamda_prime[i].y;
-        }
+        tab_particules_lamda_i[index].x = particule_ip1.x;
+        tab_particules_lamda_i[index].y = particule_ip1.y;
     }
   
 }
@@ -139,22 +126,22 @@ void write_xy (FILE *fp,Particule tab_particules[],int N) {
 }
 int main() 
 {
-    double L=45.0;
-    double T=0.1;
+    double L=10.0;
+    double T=20;
     int N=100;
     srand((unsigned int)time(NULL));
-    Particule tab_particules_lamda[N];
-    Particule tab_particules_lamda_prime[N];
+    Particule tab_particules_lamda_i[N];
     FILE *pos = fopen("Positions_xy.txt", "w");
     
-    configuration_cristalline(tab_particules_lamda,N,L);
-    for (int step=0; step<5000;step++)
+    configuration_cristalline(tab_particules_lamda_i,N,L);
+    for (int step=0; step<5000; step++)
     {
-        copy_configuration(tab_particules_lamda,tab_particules_lamda_prime,N);
-        Tirage_changement(tab_particules_lamda_prime,N);
-        Metropolis(tab_particules_lamda,tab_particules_lamda_prime,N,T,L);
-        conditions_periodiques(tab_particules_lamda,N,L);
-        write_xy(pos,tab_particules_lamda,N);
+        Metropolis(tab_particules_lamda_i,N,T,L);
+        conditions_periodiques(tab_particules_lamda_i,N,L);
+        if (step % 10 == 0)
+        {
+            write_xy(pos,tab_particules_lamda_i,N);
+        }
     }
     fclose(pos);
    
