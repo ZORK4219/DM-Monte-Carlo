@@ -58,8 +58,29 @@ double Energie_1part(Particule tab_particules[], Particule part_concernee, int i
         if( rij<rc)
         {
             U += 4 *((pow(1/rij,12) - pow(1/rij,6)) )-U_decale;
-            printf("U = %f\n", U);
         }      
+    }
+    return U;
+}
+
+double Energie_totale(Particule tab_particules[], int taille_tableau, double taille_boite)
+{
+    double rij,U=0.0;
+    double U_decale=4*(pow(1/rc,12) - pow(1/rc,6)),dx,dy;
+    for (int i = 0; i < taille_tableau; i++)
+    {
+        for (int j = i + 1; j < taille_tableau; j++)
+        {
+            dx=tab_particules[i].x-tab_particules[j].x;
+            dy=tab_particules[i].y-tab_particules[j].y;
+            dx=dx-round(dx/taille_boite)*taille_boite;
+            dy=dy-round(dy/taille_boite)*taille_boite;
+            rij=sqrt(dx*dx+dy*dy);
+            if( rij<rc)
+            {
+                U += 4 *((pow(1/rij,12) - pow(1/rij,6)) )-U_decale;
+            }      
+        }
     }
     return U;
 }
@@ -80,7 +101,6 @@ void Metropolis(Particule tab_particules_lamda_i[], int N, double T, double L)
 {    
     // Tirer une particule au hasard
     int index = rand() % (N);
-    printf("index tiré = %d\n", index);
     double Dr=0.2;
     Particule particule_i = tab_particules_lamda_i[index];
     Particule particule_ip1 = tab_particules_lamda_i[index];
@@ -104,7 +124,6 @@ void Metropolis(Particule tab_particules_lamda_i[], int N, double T, double L)
 
     double facteur_boltzmann=exp(-delta_E/T);
     double A=fmin(1,facteur_boltzmann);
-    printf("A = %f | boltzmann = %f\n", A, facteur_boltzmann);
     double nombre = ((double)rand() / RAND_MAX);
 
     if(nombre<A)
@@ -124,25 +143,70 @@ void write_xy (FILE *fp,Particule tab_particules[],int N) {
   }
   
 }
+
+void write_parametre_valeur (FILE* fichier, double parametre, double valeur, int type) {
+    if (type == 0) {
+        fprintf(fichier, "%-10s | %-10s\n", "Paramètre", "Fonction");
+    }
+
+    if (type == 1) {
+        fprintf(fichier, "%-10.6f | %-10.6f\n", parametre, valeur);
+    }
+}
+
+void afficher_barre_progression(int etape_actuelle, int total_etapes) {
+    const int largeur_barre = 50; // Largeur de la barre en caractères
+    int progression = (etape_actuelle * largeur_barre) / total_etapes;
+    printf("\r["); // Retour au début de la ligne
+    for (int i = 0; i < largeur_barre; i++) {
+        if (i < progression)
+            printf("=");
+        else
+            printf(" ");
+    }
+    printf("] %d%%", (etape_actuelle * 100) / total_etapes);
+    fflush(stdout); // Forcer l'affichage immédiat
+}
+
 int main() 
 {
     double L=10.0;
-    double T=20;
+    double T=0.05;
     int N=100;
     srand((unsigned int)time(NULL));
     Particule tab_particules_lamda_i[N];
-    FILE *pos = fopen("Positions_xy.txt", "w");
-    
-    configuration_cristalline(tab_particules_lamda_i,N,L);
-    for (int step=0; step<5000; step++)
-    {
-        Metropolis(tab_particules_lamda_i,N,T,L);
-        conditions_periodiques(tab_particules_lamda_i,N,L);
-        if (step % 10 == 0)
+
+    FILE* fichier_energie = fopen("Energie_rho.txt", "w");
+    double densite_min = 0.001; double densite_max = 1.3;
+    double energie; double densite = densite_min;
+    int nbr_mesure = 1000;
+    int nbr_step = 500000;
+    double delta_densite = (densite_max - densite_min) / nbr_mesure;
+
+    write_parametre_valeur(fichier_energie, densite, energie/N, 0);
+    for (int i = 0; i < nbr_mesure; i++) {
+        double Volume = N / densite;
+        L = sqrt(Volume);
+
+        Particule tab_particules_lamda_i[N];
+        configuration_cristalline(tab_particules_lamda_i,N,L);
+        for (int step=0; step<=nbr_step; step++)
         {
-            write_xy(pos,tab_particules_lamda_i,N);
+            Metropolis(tab_particules_lamda_i,N,T,L);
+            conditions_periodiques(tab_particules_lamda_i,N,L);
+            if (step = nbr_step) 
+            {
+                energie = Energie_totale(tab_particules_lamda_i, N, L);
+            }
         }
+        write_parametre_valeur(fichier_energie, densite, energie/N, 1);
+
+        densite = densite + delta_densite;
+        
     }
-    fclose(pos);
+
+
+
+    fclose(fichier_energie);
    
 }
