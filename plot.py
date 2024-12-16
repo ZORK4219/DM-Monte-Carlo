@@ -2,36 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Charger les données depuis le fichier
-data = np.loadtxt('Positions_xy.txt')
+#data = np.loadtxt('Positions_xy.txt')
 
-# Extraire les coordonnées x et y
-x = data[:, 0]
-y = data[:, 1]
+# Initialiser les listes pour les coordonnées
+x_coords = []
+y_coords = []
 
-# Taille de la boîte
-L = 45
+# Lire le fichier ligne par ligne
+with open('Positions_xy_end.txt', 'r') as file:
+    for line in file:
+        # Si la ligne commence par 'A', c'est une ligne de données valide
+        if line.startswith('A'):
+            # Extraire les coordonnées x et y après le mot "A"
+            parts = line.split()
+            x_coords.append(float(parts[1]))  # Coordonnée x
+            y_coords.append(float(parts[2]))  # Coordonnée y
 
-# Créer une figure et un sous-graphique
-fig, ax = plt.subplots()
+# Tracer les coordonnées sur un graphique 2D
+plt.figure(figsize=(8, 8))
+plt.scatter(x_coords, y_coords, color='blue', marker='o', s=10)
 
-# Tracer les particules
-ax.scatter(x, y, c='r', marker='o', label='Particules')
+# Ajouter des labels et un titre
+plt.xlabel('Coordonnée x', fontsize=14)
+plt.ylabel('Coordonnée y', fontsize=14)
+#plt.title('Positions des partciles')
 
-# Dessiner la boîte
-box_x = -L / 2
-box_y = -L / 2
-ax.add_patch(plt.Rectangle((box_x, box_y), L, L, fill=False, edgecolor='blue', linewidth=2, label='Boîte'))
-
-# Ajouter des labels et une légende
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_title('Réseau de particules avec boîte limite')
-ax.legend()
-
-# Ajuster les limites du graphique pour inclure toute la boîte
-ax.set_xlim(box_x - 5, box_x + L + 5)
-ax.set_ylim(box_y - 5, box_y + L + 5)
-
-# Afficher le plot
-plt.axis('equal')  # Assurer une échelle égale pour x et y
+# Afficher le graphique
+#plt.grid(True)
+plt.gca().set_aspect('equal', adjustable='box')  # Pour garder le même rapport entre les axes X et Y
 plt.show()
